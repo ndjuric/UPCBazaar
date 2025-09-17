@@ -204,17 +204,23 @@ class UPCRepository extends EventEmitter {
     // Log merged fields
     try { this.fsCfg.log && this.fsCfg.log(`UPC ${upc}: merged fields -> ${Array.from(merged).join(', ')}`) } catch (_) {}
 
-    // Normalize text fields via LM (best-effort) then heuristics
+    // Grammar fixes via LLM for specific fields
     try {
-      const { title: nt, description: nd } = await this.lmClient.normalizeFields({ title: flat.title, description: flat.description });
-      const tChanged = nt && flat.title && nt !== flat.title
-      const dChanged = nd !== undefined && flat.description !== undefined && nd !== flat.description
-      if (nt) flat.title = nt;
-      if (nd) flat.description = nd;
-      if (tChanged || dChanged) this.fsCfg.log && this.fsCfg.log(`UPC ${upc}: normalized title/description (titleChanged=${!!tChanged}, descChanged=${!!dChanged})`)
-    } catch (_) {
-      // ignore normalization errors
-    }
+      if (flat.title) {
+        const fixed = await this.lmClient.fixGrammar(flat.title)
+        if (fixed && fixed !== flat.title) {
+          this.fsCfg.log && this.fsCfg.log(`UPC ${upc}: grammar fixed title`)
+          flat.title = fixed
+        }
+      }
+      if (flat.description) {
+        const fixedD = await this.lmClient.fixGrammar(flat.description)
+        if (fixedD && fixedD !== flat.description) {
+          this.fsCfg.log && this.fsCfg.log(`UPC ${upc}: grammar fixed description`)
+          flat.description = fixedD
+        }
+      }
+    } catch (_) { }
     // Remove empty strings and nulls
     for (const k of Object.keys(flat)) {
       const v = flat[k];
@@ -239,6 +245,7 @@ class UPCRepository extends EventEmitter {
       } else {
         product = data; // already flat
       }
+      // No LLM calls on cached reads; grammar was applied during initial save or migration.
       // find first local image
       let img = null;
       const numbered = [1, 2, 3].map((i) => `${upc}_${i}.jpg`);

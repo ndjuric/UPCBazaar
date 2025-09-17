@@ -1,4 +1,3 @@
-import React, { useState } from 'react'
 import { Card, CardContent, CardHeader } from './ui/Card'
 
 function PlaceholderImage() {
@@ -64,15 +63,8 @@ export function ProductView({ product, image, upc, localImages = [] }) {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-xl font-semibold truncate">{normalizeCase(title)}</div>
+            <div className="text-xl font-semibold truncate">{brand} {model}</div>
             <div className="text-sm text-gray-500 mt-1 truncate">{product.category}</div>
-            {product.description && <p className="mt-3 text-gray-700 whitespace-pre-wrap">{product.description}</p>}
-            {(product.lowest_price || product.highest_price) && (
-              <div className="mt-3 text-sm">
-                {product.lowest_price && <span className="mr-3">Lowest: {currency}{product.lowest_price}</span>}
-                {product.highest_price && <span>Highest: {currency}{product.highest_price}</span>}
-              </div>
-            )}
             <DynamicFields product={product} />
           </div>
         </div>

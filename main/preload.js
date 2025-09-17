@@ -9,7 +9,6 @@ contextBridge.exposeInMainWorld('api', {
   listPrompts: () => invoke('prompts:list'),
   getPrompt: (name) => invoke('prompts:get', name),
   sendToLM: ({ upc, promptName }) => invoke('lm:send', { upc, promptName }),
-  normalizeDescription: (text) => invoke('lm:normalize', { text }),
   listResponses: ({ upc }) => invoke('responses:list', { upc }),
   listAllResponses: () => invoke('responses:listAll'),
   saveResponse: ({ upc, promptName, content }) => invoke('responses:save', { upc, promptName, content }),

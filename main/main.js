@@ -166,15 +166,6 @@ ipcMain.handle('lm:send', async (_e, { upc, promptName }) => {
   }
 });
 
-ipcMain.handle('lm:normalize', async (_e, { text }) => {
-  try {
-    const prompt = `Rewrite the following product description in sentence case, fixing casing and punctuation without changing meaning.\n\nText:\n${text}`;
-    const reply = await lmClient.send(prompt);
-    return { ok: true, data: reply };
-  } catch (err) {
-    return { ok: false, error: err.message || String(err) };
-  }
-});
 
 ipcMain.handle('responses:list', async (_e, { upc }) => {
   return await responseRepo.list({ upc });
