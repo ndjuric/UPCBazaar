@@ -26,10 +26,10 @@ ensureDir(imagesDir);
 ensureDir(promptsDir);
 ensureDir(responsesDir);
 
-const upcRepo = new UPCRepository({ cacheDir, imagesDir });
+const lmClient = new LMClient();
+const upcRepo = new UPCRepository({ cacheDir, imagesDir, lmClient });
 const promptRepo = new PromptRepository({ promptsDir });
 const responseRepo = new ResponseRepository({ responsesDir });
-const lmClient = new LMClient();
 
 function createWindow() {
   mainWindow = new BrowserWindow({

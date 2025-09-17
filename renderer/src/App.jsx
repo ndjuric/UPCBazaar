@@ -15,6 +15,7 @@ export default function App() {
   const [localImages, setLocalImages] = useState([])
   const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
+  const [loading, setLoading] = useState(false)
 
   async function refreshUPCs() {
     const list = await window.api.listUPCs()
@@ -22,9 +23,11 @@ export default function App() {
   }
 
   async function loadProduct(upc) {
+    setLoading(true)
     const res = await window.api.lookupUPC(upc)
     if (!res.ok) {
       setError(res.error)
+      setLoading(false)
       return
     }
     setSelectedUPC(upc)
@@ -32,12 +35,15 @@ export default function App() {
     setImage(res.data.image || null)
     setLocalImages(res.data.localImages || [])
     await refreshUPCs()
+    setLoading(false)
   }
 
   async function onLookup(upc) {
+    setLoading(true)
     const res = await window.api.lookupUPC(upc)
     if (!res.ok) {
       setError(res.error)
+      setLoading(false)
       return
     }
     setSelectedUPC(upc)
@@ -45,6 +51,7 @@ export default function App() {
     setImage(res.data.image || null)
     setLocalImages(res.data.localImages || [])
     await refreshUPCs()
+    setLoading(false)
   }
 
   useEffect(() => {
@@ -68,6 +75,11 @@ export default function App() {
       </div>
       <div className="flex flex-col">
         <div className="flex-1 p-4">
+          {loading ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-300 border-t-gray-900" />
+            </div>
+          ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -84,6 +96,7 @@ export default function App() {
               <ResponsesPanel upc={selectedUPC} />
             </TabsContent>
           </Tabs>
+          )}
         </div>
       </div>
       <Dialog
