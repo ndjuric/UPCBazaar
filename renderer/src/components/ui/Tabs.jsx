@@ -15,7 +15,7 @@ export function Tabs({ value, onValueChange, children }) {
 
 export function TabsList({ children, value, onValueChange }) {
   return (
-    <div className="mb-3 border-b border-gray-200 flex gap-2">
+    <div className="mb-3 border-b border-gray-200 flex flex-wrap gap-2">
       {React.Children.map(children, (child) => {
         if (!React.isValidElement(child)) return child
         return React.cloneElement(child, { active: child.props.value === value, onSelect: () => onValueChange(child.props.value) })
@@ -27,7 +27,7 @@ export function TabsList({ children, value, onValueChange }) {
 export function TabsTrigger({ value, children, active, onSelect }) {
   return (
     <button
-      className={`px-3 py-2 text-sm border-b-2 -mb-px ${active ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+      className={`px-3 py-2 text-sm border-b-2 -mb-px rounded-t ${active ? 'border-gray-900 text-gray-900 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'}`}
       onClick={onSelect}
     >
       {children}
@@ -39,4 +39,3 @@ export function TabsContent({ value, children, hidden }) {
   if (hidden) return null
   return <div className="mt-2">{children}</div>
 }
-

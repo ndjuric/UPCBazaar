@@ -47,17 +47,17 @@ export function ProductView({ product, image, upc, localImages = [] }) {
   return (
     <Card>
       <CardContent>
-        <div className="flex gap-4 items-start">
-          <div className="w-40 flex-shrink-0">
+        <div className="flex flex-wrap md:flex-nowrap gap-4 items-start">
+          <div className="w-full md:w-48 lg:w-56 flex-shrink-0">
             {image ? (
-              <img src={image} className="w-40 h-40 object-cover rounded border" />
+              <img src={image} className="img-fluid rounded border" />
             ) : (
               <PlaceholderImage />
             )}
             {remoteImages.length > 1 && (
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {remoteImages.slice(0, 3).map((src, i) => (
-                  <img key={i} src={src} className="w-12 h-12 object-cover rounded border" />
+              <div className="mt-2 grid grid-cols-3 sm:grid-cols-6 md:grid-cols-3 gap-2">
+                {remoteImages.slice(0, 6).map((src, i) => (
+                  <img key={i} src={src} className="w-full h-auto object-cover rounded border" />
                 ))}
               </div>
             )}
@@ -68,20 +68,6 @@ export function ProductView({ product, image, upc, localImages = [] }) {
             <DynamicFields product={product} />
           </div>
         </div>
-        {Array.isArray(product.offers) && product.offers.length > 0 && (
-          <div className="mt-4">
-            <div className="font-medium mb-2">Offers</div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {product.offers.slice(0, 6).map((o, idx) => (
-                <div key={idx} className="p-2 border rounded text-sm">
-                  <div className="font-medium truncate">{o.domain || o.title || 'Offer'}</div>
-                  {o.price && <div className="text-gray-600">{currency}{o.price}</div>}
-                  {o.ship && <div className="text-gray-500">Ship: {o.ship}</div>}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   )
