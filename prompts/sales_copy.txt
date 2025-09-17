@@ -1,0 +1,7 @@
+You are a product copywriter. Write a persuasive marketing description for this product, highlighting its main features and ending with a strong call-to-action.
+
+Product details:
+Title: {title}
+Brand: {brand}
+Category: {category}
+Description: {description}

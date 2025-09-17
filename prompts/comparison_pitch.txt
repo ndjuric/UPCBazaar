@@ -1,0 +1,9 @@
+You are helping a salesperson. Using this product data:
+
+Title: {title}
+Brand: {brand}
+Description: {description}
+Lowest recorded price: {lowest_price}
+Highest recorded price: {highest_price}
+
+Write 3 sentences why this product is a better choice than competing options.

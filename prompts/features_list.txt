@@ -1,0 +1,8 @@
+Given the following product details:
+
+Title: {title}
+Brand: {brand}
+Description: {description}
+Category: {category}
+
+Generate a clear bullet-point list of features and benefits for customers.
