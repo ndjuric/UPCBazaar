@@ -19,6 +19,8 @@
     "cross-env": "^7.0.3",
     "electron": "^30.0.0",
     "node-fetch": "^3.3.2",
+    "file-type": "^18.7.0",
+    "rotating-file-stream": "^3.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "classnames": "^2.5.1",
@@ -41,16 +43,13 @@
     "files": [
       "main/**/*",
       "renderer/dist/**/*",
-      "cache/**/*",
-      "responses/**/*",
-      "prompts/**/*",
+      "storage/**/*",
       "package.json"
     ],
     "extraResources": [
       {
-        "from": "prompts",
-        "to": "prompts",
-        "filter": ["**/*"]
+        "from": "renderer/public/placeholder.png",
+        "to": "assets/placeholder.png"
       }
     ]
   }

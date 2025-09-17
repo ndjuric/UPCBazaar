@@ -5,31 +5,13 @@ const { UPCRepository } = require('./repositories/upcRepository');
 const { PromptRepository } = require('./repositories/promptRepository');
 const { ResponseRepository } = require('./repositories/responseRepository');
 const { LMClient } = require('./services/lmClient');
+const { fsConfig } = require('./fsConfig');
 
 let mainWindow;
+let upcRepo, promptRepo, responseRepo;
 
 const appRoot = app.getAppPath();
-const userDataRoot = app.isPackaged ? process.resourcesPath : appRoot;
-const dataRoot = appRoot; // Keep paths relative to project root in dev
-
-function ensureDir(p) {
-  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
-}
-
-const cacheDir = path.join(dataRoot, 'cache');
-const imagesDir = path.join(cacheDir, 'images');
-const promptsDir = path.join(dataRoot, 'prompts');
-const responsesDir = path.join(dataRoot, 'responses');
-
-ensureDir(cacheDir);
-ensureDir(imagesDir);
-ensureDir(promptsDir);
-ensureDir(responsesDir);
-
 const lmClient = new LMClient();
-const upcRepo = new UPCRepository({ cacheDir, imagesDir, lmClient });
-const promptRepo = new PromptRepository({ promptsDir });
-const responseRepo = new ResponseRepository({ responsesDir });
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -77,22 +59,63 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  // Seed example prompt if none exist
+  const fsCfg = fsConfig.init();
+  // initialize repositories with unified storage
+  upcRepo = new UPCRepository({
+    upcsDir: fsCfg.upcsDir,
+    imagesDir: fsCfg.imagesDir,
+    responsesDir: fsCfg.responsesDir,
+    lmClient,
+    fsCfg,
+  });
+  promptRepo = new PromptRepository({ promptsDir: fsCfg.promptsDir, fsCfg });
+  responseRepo = new ResponseRepository({ responsesDir: fsCfg.responsesDir, fsCfg });
+  // Seed example prompt if none exist (in storage/prompts)
   try {
-    const files = fs.readdirSync(promptsDir).filter((f) => f.endsWith('.txt'));
+    const files = fs.readdirSync(fsCfg.promptsDir).filter((f) => f.endsWith('.txt'));
     if (files.length === 0) {
       fs.writeFileSync(
-        path.join(promptsDir, 'sales_copy.txt'),
+        path.join(fsCfg.promptsDir, 'sales_copy.txt'),
         `You are a product copywriter. Write a persuasive marketing description for this product, highlighting its main features and ending with a strong call-to-action.\n\nProduct details:\nTitle: {title}\nBrand: {brand}\nCategory: {category}\nDescription: {description}\n`
       );
     }
   } catch (e) {}
+
+  // Migrate prompts from old root folder if present
+  try {
+    const oldPrompts = path.join(appRoot, 'prompts')
+    if (fs.existsSync(oldPrompts)) {
+      const olds = fs.readdirSync(oldPrompts).filter(f => f.endsWith('.txt'))
+      for (const f of olds) {
+        const src = path.join(oldPrompts, f)
+        const dst = path.join(fsCfg.promptsDir, f)
+        if (!fs.existsSync(dst)) fs.copyFileSync(src, dst)
+      }
+      if (olds.length) fsCfg.log && fsCfg.log(`Migrated ${olds.length} prompt(s) to storage/prompts`)
+    }
+  } catch (_) {}
 
   createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+
+  // Log resolved thumbnail paths for all UPCs at startup
+  try {
+    const files = fs.readdirSync(fsCfg.upcsDir).filter(f => f.endsWith('.json'))
+    for (const f of files) {
+      const upc = path.basename(f, '.json')
+      const candidates = [1,2,3].map(i => `${upc}_${i}.jpg`)
+      let resolved = fsCfg.placeholder
+      for (const c of candidates) {
+        // eslint-disable-next-line no-await-in-loop
+        const full = await fsCfg.resolveImage(c)
+        if (full !== fsCfg.placeholder) { resolved = full; break }
+      }
+      fsCfg.log(`Thumbnail for ${upc}: ${resolved}`)
+    }
+  } catch (_) {}
 });
 
 app.on('window-all-closed', () => {

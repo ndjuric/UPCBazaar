@@ -1,0 +1,8 @@
+Take this product:
+
+{title}, {brand}, {description}
+
+Write:
+- A 50-word ad for a website
+- A 20-word catchy tagline for Instagram
+- A 100-character product line for Amazon

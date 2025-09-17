@@ -13,15 +13,17 @@ function toFileUrl(p) {
 }
 
 class UPCRepository extends EventEmitter {
-  constructor({ cacheDir, imagesDir, lmClient }) {
+  constructor({ upcsDir, imagesDir, responsesDir, lmClient, fsCfg }) {
     super();
-    this.cacheDir = cacheDir;
+    this.upcsDir = upcsDir;
     this.imagesDir = imagesDir;
+    this.responsesDir = responsesDir;
     this.lmClient = lmClient;
+    this.fsCfg = fsCfg;
   }
 
   cachePath(upc) {
-    return path.join(this.cacheDir, `${upc}.json`);
+    return path.join(this.upcsDir, `${upc}.json`);
   }
 
   imagePath(upc) {
@@ -29,20 +31,23 @@ class UPCRepository extends EventEmitter {
   }
 
   async list() {
-    const files = (await fsp.readdir(this.cacheDir)).filter((f) => f.endsWith('.json'));
+    const files = (await fsp.readdir(this.upcsDir)).filter((f) => f.endsWith('.json'));
     const list = [];
     for (const f of files) {
       try {
-        const filePath = path.join(this.cacheDir, f);
+        const filePath = path.join(this.upcsDir, f);
         const data = JSON.parse(await fsp.readFile(filePath, 'utf-8'));
         const upc = (data.upc && String(data.upc)) || path.basename(f, '.json');
         // prefer numbered images
         let imgPath = null;
         for (let i = 1; i <= 3; i++) {
-          const p = path.join(this.imagesDir, `${upc}_${i}.jpg`);
-          if (fs.existsSync(p)) { imgPath = p; break; }
+          const p = await this.fsCfg.resolveImage(`${upc}_${i}.jpg`);
+          if (p !== this.fsCfg.placeholder) { imgPath = p; break; }
         }
-        if (!imgPath && fs.existsSync(this.imagePath(upc))) imgPath = this.imagePath(upc);
+        if (!imgPath) {
+          const legacy = await this.fsCfg.resolveImage(`${upc}.jpg`)
+          if (legacy !== this.fsCfg.placeholder) imgPath = legacy
+        }
         const product = data.product || data.raw ? (await this.flattenAndNormalize(data.raw || { items: [data.product] }, upc)) : data;
         if (data.product || data.raw) await fsp.writeFile(filePath, JSON.stringify(product, null, 2), 'utf-8');
         list.push({
@@ -53,7 +58,7 @@ class UPCRepository extends EventEmitter {
           lowest_price: product.lowest_price || null,
           highest_price: product.highest_price || null,
           currency: product.currency || '',
-          image: imgPath ? toFileUrl(imgPath) : null,
+          image: imgPath ? toFileUrl(imgPath) : toFileUrl(this.fsCfg.placeholder),
         });
       } catch (_) {}
     }
@@ -108,6 +113,7 @@ class UPCRepository extends EventEmitter {
     if (!res.ok) throw new Error(`API request failed: ${res.status}`);
     const json = await res.json();
     if (!json || !json.items || json.items.length === 0) {
+      this.fsCfg.log && this.fsCfg.log(`No results for UPC ${upc}`)
       throw new Error('No results found for this UPC.');
     }
     return json;
@@ -129,23 +135,24 @@ class UPCRepository extends EventEmitter {
   async flattenAndNormalize(raw, upc) {
     const flat = { upc };
     const items = Array.isArray(raw?.items) && raw.items.length ? raw.items : (raw ? [raw] : []);
+    const merged = new Set();
     const setIfEmpty = (key, val) => {
       if (val === undefined || val === null) return;
       if (typeof val === 'string') {
         const v = val.trim();
         if (!v) return;
-        if (flat[key] === undefined) flat[key] = v;
+        if (flat[key] === undefined) { flat[key] = v; merged.add(key) }
         return;
       }
       if (typeof val === 'number' || typeof val === 'boolean') {
-        if (flat[key] === undefined) flat[key] = val;
+        if (flat[key] === undefined) { flat[key] = val; merged.add(key) }
         return;
       }
       if (Array.isArray(val)) {
         if (key === 'images') {
           const cur = Array.isArray(flat.images) ? flat.images : [];
           for (const u of val) {
-            if (typeof u === 'string' && u.trim() && !cur.includes(u)) cur.push(u);
+            if (typeof u === 'string' && u.trim() && !cur.includes(u)) { cur.push(u); }
           }
           if (cur.length) flat.images = cur;
         } else if (key === 'category_path') {
@@ -153,7 +160,7 @@ class UPCRepository extends EventEmitter {
         } else {
           // Keep arrays of strings if not empty
           const arr = val.filter((x) => typeof x === 'string' && x.trim());
-          if (arr.length && flat[key] === undefined) flat[key] = arr;
+          if (arr.length && flat[key] === undefined) { flat[key] = arr; merged.add(key) }
         }
         return;
       }
@@ -194,11 +201,17 @@ class UPCRepository extends EventEmitter {
       }
     }
 
+    // Log merged fields
+    try { this.fsCfg.log && this.fsCfg.log(`UPC ${upc}: merged fields -> ${Array.from(merged).join(', ')}`) } catch (_) {}
+
     // Normalize text fields via LM (best-effort) then heuristics
     try {
       const { title: nt, description: nd } = await this.lmClient.normalizeFields({ title: flat.title, description: flat.description });
+      const tChanged = nt && flat.title && nt !== flat.title
+      const dChanged = nd !== undefined && flat.description !== undefined && nd !== flat.description
       if (nt) flat.title = nt;
       if (nd) flat.description = nd;
+      if (tChanged || dChanged) this.fsCfg.log && this.fsCfg.log(`UPC ${upc}: normalized title/description (titleChanged=${!!tChanged}, descChanged=${!!dChanged})`)
     } catch (_) {
       // ignore normalization errors
     }
@@ -228,17 +241,26 @@ class UPCRepository extends EventEmitter {
       }
       // find first local image
       let img = null;
-      const numbered = [1, 2, 3].map((i) => path.join(this.imagesDir, `${upc}_${i}.jpg`));
+      const numbered = [1, 2, 3].map((i) => `${upc}_${i}.jpg`);
       const localImages = [];
-      for (const p of numbered) if (fs.existsSync(p)) { localImages.push(toFileUrl(p)); }
-      for (const p of numbered) if (fs.existsSync(p)) { img = toFileUrl(p); break; }
-      if (!img && fs.existsSync(this.imagePath(upc))) img = toFileUrl(this.imagePath(upc));
+      for (const name of numbered) {
+        const p = await this.fsCfg.resolveImage(name)
+        if (p !== this.fsCfg.placeholder) localImages.push(toFileUrl(p))
+      }
+      for (const name of numbered) {
+        const p = await this.fsCfg.resolveImage(name)
+        if (p !== this.fsCfg.placeholder) { img = toFileUrl(p); break }
+      }
+      if (!img) {
+        const legacy = await this.fsCfg.resolveImage(`${upc}.jpg`)
+        if (legacy !== this.fsCfg.placeholder) img = toFileUrl(legacy)
+      }
       const result = { upc, product, image: img, localImages };
       this.emit('upc-added', { upc, title: product.title || upc, brand: product.brand || '', image: img, model: product.model || '', lowest_price: product.lowest_price, highest_price: product.highest_price, currency: product.currency || '' });
       return result;
     }
 
-    await ensureDir(this.cacheDir);
+    await ensureDir(this.upcsDir);
     await ensureDir(this.imagesDir);
     const raw = await this.fetchFromAPI(upc);
     const product = await this.flattenAndNormalize(raw, upc);
@@ -255,6 +277,7 @@ class UPCRepository extends EventEmitter {
           const u = toFileUrl(dest);
           localImages.push(u);
           if (!firstImg) firstImg = u;
+          this.fsCfg.log && this.fsCfg.log(`Saved image: ${dest}`)
         }
         idx++;
       }
@@ -265,6 +288,7 @@ class UPCRepository extends EventEmitter {
       }
     }
     await fsp.writeFile(cache, JSON.stringify(product, null, 2), 'utf-8');
+    this.fsCfg.log && this.fsCfg.log(`Saved product JSON: ${cache}`)
     const result = { upc, product, image: firstImg, localImages };
     this.emit('upc-added', { upc, title: product.title || upc, brand: product.brand || '', image: firstImg, model: product.model || '', lowest_price: product.lowest_price, highest_price: product.highest_price, currency: product.currency || '' });
     return result;
@@ -281,7 +305,15 @@ class UPCRepository extends EventEmitter {
     }
     const legacy = this.imagePath(upc);
     if (fs.existsSync(legacy)) await fsp.unlink(legacy);
+    // also delete responses
+    try {
+      const files = fs.readdirSync(this.responsesDir).filter(f => f.startsWith(`${upc}_`) && f.endsWith('.txt'))
+      for (const f of files) {
+        await fsp.unlink(path.join(this.responsesDir, f))
+      }
+    } catch (_) {}
+    this.fsCfg.log && this.fsCfg.log(`Deleted UPC: ${upc} (json, images, responses)`)
   }
-  }
+}
 
 module.exports = { UPCRepository };

@@ -8,9 +8,10 @@ function pad3(n) {
 }
 
 class ResponseRepository extends EventEmitter {
-  constructor({ responsesDir }) {
+  constructor({ responsesDir, fsCfg }) {
     super();
     this.responsesDir = responsesDir;
+    this.fsCfg = fsCfg;
   }
 
   async list({ upc }) {
@@ -51,6 +52,7 @@ class ResponseRepository extends EventEmitter {
       idx += 1;
     }
     await fsp.writeFile(file, content, 'utf-8');
+    this.fsCfg && this.fsCfg.log && this.fsCfg.log(`Saved response: ${file}`)
     this.emit('responses-updated', { upc });
     return file;
   }
@@ -59,6 +61,7 @@ class ResponseRepository extends EventEmitter {
     await fsp.unlink(filePath);
     const base = path.basename(filePath);
     const upc = base.split('_')[0];
+    this.fsCfg && this.fsCfg.log && this.fsCfg.log(`Deleted response: ${filePath}`)
     this.emit('responses-updated', { upc });
   }
 }

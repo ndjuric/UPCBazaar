@@ -1,0 +1,8 @@
+You are a product copywriter. Write a short sales-oriented description for:
+
+Product: {title}
+Brand: {brand}
+Category: {category}
+Description: {description}
+
+Highlight what makes it appealing and end with a call-to-action.

@@ -16,23 +16,21 @@ The renderer runs via Vite and Electron launches automatically. All file I/O (ca
 - `main/` – Electron main process
   - `main.js` – creates window, wires IPC
   - `preload.js` – safe IPC bridge (`window.api`)
+  - `fsConfig.js` – centralized storage paths, logging (rotating), and image resolution
   - `repositories/` – repository pattern for data
-    - `upcRepository.js` – UPC lookups, caching, image download
+    - `upcRepository.js` – UPC lookups, normalized flat JSON, image download
     - `promptRepository.js` – prompts loader (Factory pattern)
     - `responseRepository.js` – saved responses store
   - `services/lmClient.js` – LM Studio integration
 - `renderer/` – React UI (Vite)
   - `index.html` – Vite entry
-  - `src/` – React components
-    - `App.jsx` – layout and orchestration
-    - `components/Sidebar.jsx` – UPC input + list
-    - `components/ProductView.jsx` – product card
-    - `components/PromptPanel.jsx` – prompts, send, responses
-    - `components/ui/*` – shadcn/ui-style primitives (Card, Button, Dialog, Input, Separator)
-- `cache/` – JSON cache for UPCs (auto-created)
-- `cache/images/` – downloaded product images (auto-created)
-- `prompts/` – prompt `.txt` files (auto-created; seeded with `sales_copy.txt`)
-- `responses/` – saved assistant replies (auto-created)
+  - `src/` – React components (Sidebar, ProductView, PromptPanel, ResponsesPanel, ui/*)
+- `storage/` – unified runtime data (auto-created)
+  - `upcs/` – normalized product JSONs: `storage/upcs/{upc}.json`
+  - `images/` – product images: `storage/images/{upc}_{1..3}.jpg`
+  - `responses/` – saved assistant replies: `storage/responses/{upc}_{prompt}_{###}.txt`
+  - `prompts/` – prompt `.txt` files (seeded with `sales_copy.txt`)
+  - `logs/` – rotating application logs (`app.log` + gzipped rotations)
 
 ## Features
 
@@ -107,7 +105,14 @@ Artifacts will include the prebuilt renderer (`renderer/dist`) and runtime resou
 ## Notes
 
 - Paths used:
-  - Cache: `cache/{upc}.json`
-  - Images: `cache/images/{upc}.jpg`
-  - Prompts: `prompts/*.txt`
-  - Responses: `responses/{upc}_{prompt}_{increment}.txt`
+  - Products: `storage/upcs/{upc}.json` (flat, normalized JSON)
+  - Images: `storage/images/{upc}_{1..3}.jpg`
+  - Prompts: `storage/prompts/*.txt`
+  - Responses: `storage/responses/{upc}_{prompt}_{increment}.txt`
+  - Logs: `storage/logs/app.log` (rotates at 1MB, gzip, keeps 5)
+
+## Logging
+
+- Rotating logs via `rotating-file-stream` at `storage/logs/app.log` (1MB max per file, gzip compression, retains 5 files).
+- Each entry is timestamped (ISO8601).
+- Logs include: startup paths, API no-result cases, normalization steps, file create/delete events, and resolved thumbnails on startup.

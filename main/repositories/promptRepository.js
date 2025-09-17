@@ -10,10 +10,11 @@ class PromptFactory {
 }
 
 class PromptRepository extends EventEmitter {
-  constructor({ promptsDir }) {
+  constructor({ promptsDir, fsCfg }) {
     super();
     this.promptsDir = promptsDir;
     this.factory = new PromptFactory();
+    this.fsCfg = fsCfg;
     this._watch();
   }
 
@@ -38,4 +39,3 @@ class PromptRepository extends EventEmitter {
 }
 
 module.exports = { PromptRepository };
-
