@@ -1,4 +1,4 @@
-# NarraCom
+# UPCBazaar
 
 Electron + React + TailwindCSS + shadcn/ui-style components. Cross‑platform desktop app to look up products by UPC, cache results, browse prompts, send to LM Studio (OpenAI‑compatible API), and manage saved responses.
 
